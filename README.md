@@ -5,7 +5,7 @@
 
 ## Author & Academic Context
 
-* **Authors:** Sebastián H. Beltrán & Jose Ochoa
+* **Authors:** Sebastián H. Beltrán 
 * **Academic Background:** Master's in Statistics — *Universidad Nacional de Colombia*
 * **Domain:** Multivariate Statistical Analysis / Actuarial Science / Latent Variable Modeling
 
