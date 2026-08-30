@@ -7,9 +7,6 @@
 
 This repository contains a statistical analysis of **common and unique factors** using multivariate statistical methods in R. The project was initially developed as part of my work in the **Master's in Statistics at Universidad Nacional de Colombia**. I am now organizing and extending the analysis so that it can be reproduced and presented as part of my data science and statistical modeling portfolio.
 
-### What is this project about?
-When several variables in an insurance portfolio are related to each other, it is possible that part of their variability comes from a smaller number of underlying factors. Factor analysis provides a way to study this structure by separating shared variability from variable-specific noise.
-
 ---
 
 ## Theoretical Framework & Mathematical Model
@@ -34,9 +31,9 @@ $$\mathbf{\Sigma} = \mathbf{\Lambda} \mathbf{\Lambda}^T + \mathbf{\Psi}$$
 
 The repository is organized into three progressive R modules in `R/`:
 
-1. **`R/01_data_cleaning_and_diagnostics.R`**: Resolves exact linear dependency ($\text{total\_claim\_amount} = \text{injury} + \text{property} + \text{vehicle}$) to eliminate correlation matrix singularity ($\det(\mathbf{R}) > 0$) and computes Kaiser-Meyer-Olkin adequacy (**Overall KMO = 0.61**).
-2. **`R/02_matrix_spectral_decomposition.R`**: Standardizes observations ($\mathbf{Z}$), solves the characteristic polynomial $\det(\mathbf{R} - \lambda \mathbf{I}_p) = 0$, applies the **Kaiser Criterion** ($\lambda_i > 1.0$), and extracts initial unrotated factor loadings ($\hat{\mathbf{\Lambda}}_1$).
-3. **`R/03_varimax_rotation_and_scoring.R`**: Executes orthogonal **Varimax rotation** ($\mathbf{\Lambda}^* = \hat{\mathbf{\Lambda}}_1 \mathbf{T}$), generates factor loading heatmaps, and estimates latent factor scores ($\hat{\mathbf{F}}$) via **Thomson's Regression Method**:
+* **`R/01_data_cleaning_and_diagnostics.R`**: Resolves exact linear dependency ($\text{total\_claim\_amount} = \text{injury} + \text{property} + \text{vehicle}$) to eliminate correlation matrix singularity ($\det(\mathbf{R}) > 0$) and computes Kaiser-Meyer-Olkin adequacy (**Overall KMO = 0.61**).
+* **`R/02_matrix_spectral_decomposition.R`**: Standardizes observations ($\mathbf{Z}$), solves the characteristic polynomial $\det(\mathbf{R} - \lambda \mathbf{I}_p) = 0$, applies the **Kaiser Criterion** ($\lambda_i > 1.0$), and extracts initial unrotated factor loadings ($\hat{\mathbf{\Lambda}}_1$).
+* **`R/03_varimax_rotation_and_scoring.R`**: Executes orthogonal **Varimax rotation** ($\mathbf{\Lambda}^* = \hat{\mathbf{\Lambda}}_1 \mathbf{T}$), generates factor loading heatmaps, and estimates latent factor scores ($\hat{\mathbf{F}}$) via **Thomson's Regression Method**:
 
 $$\hat{\mathbf{F}} = \mathbf{Z} \mathbf{R}^{-1} \mathbf{\Lambda}^*$$
 
@@ -64,20 +61,6 @@ $$\hat{\mathbf{F}} = \mathbf{Z} \mathbf{R}^{-1} \mathbf{\Lambda}^*$$
 ![Rotated Factor Map](factor_loadings_map.png)
 
 ![Factor Heatmap](factor_loadings_heatmap.png)
-
----
-
-## Future Extensions: Insurance Risk Analytics
-
-An additional objective of this project is to explore how multivariate statistical techniques can be used in **insurance risk analytics**. In later stages, the extracted latent factor scores ($\hat{\mathbf{F}}$) will be connected with predictive modeling frameworks such as **Generalized Linear Models (GLMs)** to study their potential use in loss ratio estimation and risk classification.
-
----
-
-## Tools
-
-* **Language:** R
-* **Environment:** RStudio
-* **Documentation:** R Markdown / LaTeX / GitHub Flavored Markdown
 
 ---
 
