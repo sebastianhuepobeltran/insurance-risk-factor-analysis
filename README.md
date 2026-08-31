@@ -1,4 +1,4 @@
-# Insurance Risk Factor Analysis: Advanced Theoretical, Empirical & Actuarial Report
+# Insurance Risk Factor Analysis: Theoretical & Empirical Report
 ### Exploratory Factor Analysis (EFA), Spectral Decomposition & Latent Risk Modeling
 
 ---
@@ -7,225 +7,243 @@
 
 * **Author:** Sebastián H. Beltrán
 * **Academic Background:** Master's in Statistics — *Universidad Nacional de Colombia*
-* **Domain:** Multivariate Statistical Analysis / Actuarial Science / Latent Variable Modeling
+* **Domain:** Multivariate Statistical Analysis / Actuarial Analytics / Latent Variable Modeling
 
 ---
 
-## 1. Introduction & Scientific Motivation
+## 1. Project Overview & Business Problem
 
-In complex quantitative domains such as actuarial science, financial econometrics, and psychometrics, risk modelers routinely observe high-dimensional vectors of empirical metrics. However, underlying decision mechanisms—such as systemic policyholder risk profile, structural economic exposure, or true claim severity—cannot be measured directly. The central statistical question guiding this investigation is:
+Insurance datasets often contain many variables that describe policyholders, policy conditions, and claim costs. However, fundamental risk drivers—such as overall policyholder risk, economic exposure, or true claim severity—cannot be measured directly.
 
-$$\text{Is it possible to capture the joint covariance structure of multiple observed insurance variables through a parsimonious set of orthogonal, unobserved latent dimensions?}$$
+When analyzing automobile insurance portfolios, companies track driver age, customer tenure, policy deductibles, and annual premiums alongside specific payout amounts (vehicle damage, property loss, and injury claims). Feeding highly correlated metrics directly into predictive pricing models—such as Generalized Linear Models (GLMs)—creates three key statistical issues:
 
-When analyzing high-dimensional personal auto insurance portfolios, insurance companies log dozens of policyholder characteristics (e.g., driver age, customer tenure, policy deductible, annual premium) alongside granular payout metrics (vehicle damage, property loss, bodily injury claims). Feeding raw, correlated variables directly into pricing algorithms—such as Generalized Linear Models (GLMs) for loss frequency or severity—introduces critical econometric failures:
-1. **Severe Multicollinearity:** Inflated standard errors for estimated regression coefficients ($\text{VIF} \gg 10$), leading to numerical instability and counterintuitive risk ratings.
-2. **Matrix Singularity ($\det(\mathbf{R}) \approx 0$):** Accounting identity relations between individual claims and aggregate claim totals cause non-invertibility of the correlation matrix, halting maximum likelihood estimation algorithms.
-3. **Overfitting & Redundancy:** High-dimensional noise reduces out-of-sample model generalizability.
+1. **Multicollinearity & Variance Inflation:** High correlations between variables inflate standard errors for regression coefficients ($\text{VIF} \gg 10$), leading to unstable model parameters and confusing risk weights.
+2. **Matrix Singularity ($\det(\mathbf{R}) \approx 0$):** Accounting identities between individual sub-claims and aggregate claim totals make the correlation matrix non-invertible, which stops estimation algorithms from working.
+3. **Redundancy & Overfitting:** Excess variable noise reduces how well the model generalizes to new data.
 
-This project implements a rigorous, end-to-end **Exploratory Factor Analysis (EFA)** architecture grounded in the **Principle of Parsimony**. The core goal is to compress an 8-dimensional observable space ($p = 8$) into a low-dimensional subspace of orthogonal latent factors ($k = 2$, where $k \ll p$), completely isolating common variance from unique measurement noise while resolving multicollinearity for downstream actuarial pricing.
+This project uses **Exploratory Factor Analysis (EFA)** to reduce an 8-dimensional space ($p = 8$) into $k = 2$ interpretable, uncorrelated latent dimensions ($k \ll p$). The overall analytical workflow is structured as follows:
+
+$$\text{Data Cleaning} \longrightarrow \text{Factorability Diagnostics} \longrightarrow \text{Factor Selection} \longrightarrow \text{Spectral Extraction} \longrightarrow \text{Varimax Rotation} \longrightarrow \text{Factor Scoring}$$
+
+The final model condenses the 8 original variables into two main factors, explaining **54.91% of the total standardized variance**.
 
 ---
 
 ## 2. Theoretical Framework & Mathematical Formulation
 
 ### 2.1 The Classical Linear Factor Model
-Let $\mathbf{X} = (X_1, X_2, \dots, X_p)^T \in \mathbb{R}^p$ be a continuous random vector representing observable insurance variables with population expectation vector $\boldsymbol{\mu} = \mathbb{E}[\mathbf{X}]$ and positive-definite population covariance matrix $\mathbf{\Sigma} = \text{Var}(\mathbf{X})$. The classical orthogonal factor model postulates that $\mathbf{X}$ is generated by a linear combination of $k$ unobserved common factors $\mathbf{f} = (f_1, f_2, \dots, f_k)^T \in \mathbb{R}^k$ ($k < p$) plus a $p$-dimensional vector of specific unique errors $\mathbf{U} = (U_1, U_2, \dots, U_p)^T$:
+Let $\mathbf{X} = (X_1, X_2, \dots, X_p)^T \in \mathbb{R}^p$ be a continuous random vector of observed insurance variables with mean vector $\boldsymbol{\mu} = \mathbb{E}[\mathbf{X}] \in \mathbb{R}^p$ and covariance matrix $\mathbf{\Sigma} = \text{Var}(\mathbf{X}) \in \mathbb{R}^{p \times p}$. 
+
+The classical orthogonal factor model assumes that $\mathbf{X}$ is generated by a linear combination of $k$ unobserved common factors $\mathbf{f} = (f_1, f_2, \dots, f_k)^T \in \mathbb{R}^k$ ($k < p$) plus a $p$-dimensional vector of specific errors $\mathbf{U} = (U_1, U_2, \dots, U_p)^T \in \mathbb{R}^p$:
 
 $$\mathbf{X} = \boldsymbol{\mu} + \Lambda \mathbf{f} + \mathbf{U}$$
 
 Where:
-* $\boldsymbol{\mu} \in \mathbb{R}^p$ is the mean vector acting as a location parameter.
-* $\Lambda = (\lambda_{ij}) \in \mathbb{R}^{p \times k}$ is the **matrix of factor loadings**, where each component $\lambda_{ij}$ quantifies the linear sensitivity of observable variable $X_i$ to common factor $f_j$.
-* $\mathbf{f} \sim \mathcal{N}_k(\mathbf{0}, \Phi)$ represents the vector of standardized common latent factors. Assuming an orthogonal factor setup, we set $\Phi = \text{Var}(\mathbf{f}) = \mathbf{I}_k$.
+* $\boldsymbol{\mu} \in \mathbb{R}^p$ is the location parameter vector.
+* $\Lambda = (\lambda_{ij}) \in \mathbb{R}^{p \times k}$ is the **factor loading matrix**, where each entry $\lambda_{ij}$ measures how much common factor $f_j$ influences variable $X_i$.
+* $\mathbf{f} \sim \mathcal{N}_k(\mathbf{0}, \Phi)$ represents the vector of standardized common latent factors. Assuming an orthogonal setup, we set $\Phi = \text{Var}(\mathbf{f}) = \mathbf{I}_k$.
 * $\mathbf{U} \sim \mathcal{N}_p(\mathbf{0}, \Psi)$ represents unique errors or specific factors, where $\Psi = \text{diag}(\psi_1, \psi_2, \dots, \psi_p)$ is a diagonal matrix of unique variances ($\psi_i = \text{Var}(U_i)$).
 
 ### 2.2 Classical Model Assumptions
-To establish identifiability and solve the classical factor equation, we enforce the following foundational assumptions:
-1. $\mathbb{E}[\mathbf{f}] = \mathbf{0} \quad \text{and} \quad \text{Var}(\mathbf{f}) = \mathbf{I}_k$ (Common factors are standardized and mutually uncorrelated).
-2. $\mathbb{E}[\mathbf{U}] = \mathbf{0} \quad \text{and} \quad \text{Cov}(U_i, U_j) = 0 \quad \forall i \neq j \implies \text{Var}(\mathbf{U}) = \Psi = \text{diag}(\psi_1, \dots, \psi_p)$.
-3. $\text{Cov}(\mathbf{f}, \mathbf{U}) = \mathbb{E}[\mathbf{f} \mathbf{U}^T] = \mathbf{0}_{k \times p}$ (Common latent factors and unique error terms are strictly orthogonal).
+To ensure the model is identifiable and solvable, we set three standard assumptions:
+1. $\mathbb{E}[\mathbf{f}] = \mathbf{0} \quad \text{and} \quad \text{Var}(\mathbf{f}) = \mathbf{I}_k$ (Common factors are standardized and uncorrelated).
+2. $\mathbb{E}[\mathbf{U}] = \mathbf{0} \quad \text{and} \quad \text{Cov}(U_i, U_j) = 0 \quad \forall i \neq j \implies \text{Var}(\mathbf{U}) = \Psi = \text{diag}(\psi_1, \dots, \psi_p)$ (Unique components are uncorrelated with each other).
+3. $\text{Cov}(\mathbf{f}, \mathbf{U}) = \mathbb{E}[\mathbf{f} \mathbf{U}^T] = \mathbf{0}_{k \times p}$ (Common factors and unique errors are strictly orthogonal).
 
 ### 2.3 Structural Covariance & Variance Decomposition
-Applying the variance operator to both sides of the factor equation under the orthogonality assumptions yields the fundamental covariance identity:
+Applying the variance operator to both sides under these assumptions gives the covariance identity:
 
 $$\mathbf{\Sigma} = \text{Var}(\mathbf{X}) = \text{Var}(\boldsymbol{\mu} + \Lambda \mathbf{f} + \mathbf{U}) = \Lambda \text{Var}(\mathbf{f}) \Lambda^T + \text{Var}(\mathbf{U}) = \Lambda \mathbf{I}_k \Lambda^T + \Psi$$
 
 $$\mathbf{\Sigma} = \Lambda \Lambda^T + \Psi$$
 
-For any individual observable variable $X_i$, its population variance $\sigma_{ii}$ decomposes into two mutually exclusive components:
+For any single variable $X_i$, its total variance $\sigma_{ii}$ splits into two mutually exclusive parts:
 
-$$\sigma_{ii} = \sum_{j=1}^k \lambda_{ij}^2 + \psi_i = h_i^2 + \psi_i$$
+$$\sigma_{ii} = \underbrace{\sum_{j=1}^k \lambda_{ij}^2}_{\text{Communality } h_i^2} + \underbrace{\psi_i}_{\text{Uniqueness } u_i^2}$$
 
-* **Communality ($h_i^2 = \sum_{j=1}^k \lambda_{ij}^2$):** The proportion of total variance in variable $X_i$ that is accounted for by the joint operation of the $k$ common factors. A high communality ($h_i^2 \to 1.0$) indicates that $X_i$ is a primary indicator of the underlying structural phenomenon.
-* **Uniqueness / Specific Variance ($u_i^2 = \psi_i$):** The residual variance unique to variable $X_i$, encompassing both variable-specific operational characteristics and unshared random measurement noise. High uniqueness ($u_i^2 \to 1.0$) highlights variables that do not share underlying covariance with the rest of the portfolio.
+* **Communality ($h_i^2 = \sum_{j=1}^k \lambda_{ij}^2$):** The portion of total variance in variable $X_i$ explained by the $k$ common factors. High communality ($h_i^2 \to 1.0$) means the variable strongly reflects the shared underlying dimension.
+* **Uniqueness / Specific Variance ($u_i^2 = \psi_i$):** The residual variance unique to variable $X_i$, including variable-specific characteristics and unshared measurement noise. High uniqueness ($u_i^2 \to 1.0$) shows that the variable does not share variance with the rest of the dataset.
 
 ---
 
-## 3. Standardization, Reduced Correlation Matrices & Diagnostics
+## 3. Dataset & Data Diagnostics
 
-### 3.1 Scaling and Sample Correlation Matrix
-In actuarial datasets, metrics operate on vastly different physical scales (e.g., currency amounts in USD, tenure in months, driver age in years). To eliminate unit dependence, we standardize the observable vector $\mathbf{Y} = \mathbf{D}_{\sigma}^{-1/2} (\mathbf{X} - \boldsymbol{\mu})$, where $\mathbf{D}_{\sigma} = \text{diag}(\sigma_{11}, \sigma_{22}, \dots, \sigma_{pp})$. This maps the population covariance matrix to the sample correlation matrix $\mathbf{R}$:
+### 3.1 Variable Description
+The empirical analysis uses an automobile insurance dataset. To remove scale differences across currencies, tenure, and age, variables are standardized: $\mathbf{Z} = \mathbf{D}_{\sigma}^{-1/2} (\mathbf{X} - \boldsymbol{\mu})$, mapping the population covariance matrix to the sample correlation matrix $\mathbf{R} = \Lambda \Lambda^T + \Psi$.
 
-$$\mathbf{R} = \Lambda \Lambda^T + \Psi$$
+| Variable | Description | Scale Type |
+| :--- | :--- | :--- |
+| `vehicle_claim` | Vehicle-related claim payout amount | Continuous (Currency USD) |
+| `property_claim` | Property-related claim payout amount | Continuous (Currency USD) |
+| `injury_claim` | Medical injury-related claim payout amount | Continuous (Currency USD) |
+| `number_of_vehicles_involved` | Count of vehicles involved in the incident | Discrete (Integer Count) |
+| `months_as_customer` | Total customer tenure with insurer | Continuous (Months) |
+| `age` | Policyholder age | Continuous (Years) |
+| `policy_annual_premium` | Annual policy premium charged | Continuous (Currency USD) |
+| `policy_deductable` | Policy deductible contract amount | Continuous (Currency USD) |
 
-### 3.2 Matrix Singularity & Multicollinearity Remediation
-In preliminary actuarial diagnostic checks, incorporating `total_claim_amount` along with its underlying constituent sub-claims (`injury_claim`, `property_claim`, `vehicle_claim`) created an exact linear deterministic dependency:
+### 3.2 Structural Data Redundancy & Matrix Singularity
+During data cleaning, keeping `total_claim_amount` along with its sub-claims (`injury_claim`, `property_claim`, `vehicle_claim`) created an exact accounting identity:
 
 $$\text{total\_claim\_amount} - \text{injury\_claim} - \text{property\_claim} - \text{vehicle\_claim} = 0$$
 
-This exact linear identity caused a zero eigenvalue ($\lambda_p = 0$) in the spectral decomposition, driving the determinant to zero ($\det(\mathbf{R}) = 0$). As a result, the correlation matrix became non-invertible ($\mathbf{R}^{-1}$ undefined), breaking numerical estimation algorithms. Removing `total_claim_amount` restored full rank ($\text{rank}(\mathbf{R}) = p = 8$) and guaranteed positive-definiteness ($\det(\mathbf{R}) > 0$).
+This linear identity caused a zero eigenvalue ($\lambda_p = 0$), making the matrix determinant zero ($\det(\mathbf{R}) = 0$). As a result, the correlation matrix became non-invertible ($\mathbf{R}^{-1}$ undefined). 
 
-### 3.3 Sampling Adequacy: KMO & Bartlett's Test of Sphericity
-Before factor extraction, sampling factorability was evaluated using two complementary diagnostics:
+Removing `total_claim_amount` fixed the matrix rank ($\text{rank}(\mathbf{R}) = p = 8$) and restored invertibility ($\det(\mathbf{R}) > 0$). This step is treated as a **data quality correction** rather than an arbitrary feature removal.
 
-1. **Bartlett's Test of Sphericity:** Tests the null hypothesis that the population correlation matrix is an identity matrix ($H_0: \mathbf{R} = \mathbf{I}_p$). A statistically significant result ($p\text{-value} < 0.001$) rejected $H_0$, confirming that significant non-zero pairwise correlations exist among portfolio attributes.
-2. **Kaiser-Meyer-Olkin (KMO) Measure of Sampling Adequacy:** Compares the magnitude of observed correlation coefficients to partial correlation coefficients:
+---
+
+## 4. Sampling Adequacy & Factorability Diagnostics
+
+We evaluated sample factorability using two standard diagnostic tests:
+
+### 4.1 Bartlett's Test of Sphericity
+Bartlett's test checks whether the correlation matrix is an identity matrix:
+
+$$H_0: \mathbf{R} = \mathbf{I}_p \quad \text{vs.} \quad H_1: \mathbf{R} \neq \mathbf{I}_p$$
+
+Calculated using the log-determinant transformation:
+
+$$\chi^2 = -\left( n - 1 - \frac{2p + 5}{6} \right) \ln \det(\mathbf{R})$$
+
+The test gave a statistically significant result ($p\text{-value} < 0.001$), rejecting $H_0$ and confirming that meaningful correlations exist between variables.
+
+### 4.2 Kaiser-Meyer-Olkin (KMO) Measure
+The KMO statistic compares observed correlations against partial correlations:
 
 $$\text{KMO} = \frac{\sum_{i \neq j} r_{ij}^2}{\sum_{i \neq j} r_{ij}^2 + \sum_{i \neq j} a_{ij}^2}$$
 
-Where $r_{ij}$ is the simple correlation between variables $i$ and $j$, and $a_{ij}$ is their partial correlation controlling for all other variables. The post-cleaning dataset yielded an **Overall KMO of 0.61**, exceeding the acceptable threshold ($> 0.50$) and confirming that common variance dominates partial variance in the reduced variable set.
+Where $r_{ij}$ is the simple correlation between variables $i$ and $j$, and $a_{ij}$ is their partial correlation.
+
+The dataset produced an **Overall KMO of 0.61**. This shows **moderate but acceptable sampling adequacy**, confirming that common variance is sufficient for factor extraction while acknowledging variable specificity.
 
 ---
 
-## 4. Factor Extraction, Rotations, Geometry & Heywood Cases
+## 5. Factor Selection, Extraction & Rotation
 
-### 4.1 Spectral Decomposition & Kaiser's Rule
-Factor extraction was conducted via Principal Factor Analysis (PFA) operating on the **reduced correlation matrix** $\mathbf{R}^* = \mathbf{R} - \Psi$, where main diagonal entries are replaced by initial communality estimates ($h_i^2 \approx R_i^2$, the squared multiple correlation of $X_i$ with all other variables).
+### 5.1 Spectral Extraction & Kaiser's Rule
+Factor extraction was performed using Principal Factor Analysis (PFA) on the **reduced correlation matrix** $\mathbf{R}^* = \mathbf{R} - \Psi$, replacing diagonal elements with initial communality estimates ($h_i^2 \approx R_i^2$).
 
-The characteristic equation $\det(\mathbf{R} - \lambda \mathbf{I}_p) = 0$ was solved to yield eigenvalues $\lambda_1 \ge \lambda_2 \ge \dots \ge \lambda_p$ and orthonormal eigenvectors $\mathbf{e}_j$. Based on **Kaiser's Criterion** ($\lambda_j > 1.0$) combined with Scree Plot inflection point analysis, exactly $k = 2$ latent factors were retained:
-* **Factor 1 ($\lambda_1 = 2.51$):** Explains $31.42\%$ of portfolio variance.
-* **Factor 2 ($\lambda_2 = 1.89$):** Explains $23.49\%$ of portfolio variance.
-* **Cumulative Variance Explained:** $54.91\%$ of total system variability captured using only $25\%$ of original dimensions ($k/p = 2/8$).
+Solving $\det(\mathbf{R}^* - \lambda \mathbf{I}_p) = 0$ produced eigenvalues $\lambda_1 \ge \lambda_2 \ge \dots \ge \lambda_p$. Using **Kaiser's Criterion** ($\lambda_j > 1.0$) and Scree Plot analysis, $k = 2$ factors were retained:
 
-### 4.2 Rotation Indeterminacy & The Varimax Criterion
-Initial unrotated factor loadings $\Lambda$ suffer from cross-loading ambiguity, where multiple variables exhibit moderate loadings on several factors simultaneously. Because orthogonal transformations preserve structural covariance:
+* **Factor 1 ($\lambda_1 = 2.51$):** Explains $31.42\%$ of standardized variance.
+* **Factor 2 ($\lambda_2 = 1.89$):** Explains $23.49\%$ of standardized variance.
+* **Cumulative Explained Variance:** $54.91\%$ of total system variability captured using $25\%$ of original dimensions ($k/p = 2/8$).
 
-$$\Lambda^* = \Lambda \mathbf{T}, \quad \mathbf{f}^* = \mathbf{T}^T \mathbf{f} \implies \Lambda^* \Lambda^{*T} = (\Lambda \mathbf{T})(\Lambda \mathbf{T})^T = \Lambda \mathbf{T} \mathbf{T}^T \Lambda^T = \Lambda \Lambda^T = \mathbf{R} - \Psi$$
+### 5.2 Orthogonal Varimax Rotation
+Unrotated loadings $\Lambda$ often suffer from cross-loading ambiguity. If $\mathbf{T} \in \mathbb{R}^{k \times k}$ is an orthogonal matrix ($\mathbf{T}^T \mathbf{T} = \mathbf{I}_k$), transformed loadings $\Lambda^* = \Lambda \mathbf{T}$ satisfy:
 
-Because communalities ($h_i^{*2} = h_i^2$) are invariant under any orthogonal matrix $\mathbf{T}$ ($\mathbf{T}^T \mathbf{T} = \mathbf{I}$), an infinite set of mathematically equivalent loading matrices exists. To achieve Thurstone's **Simple Structure**, we apply **Orthogonal Varimax Rotation**, which maximizes the variance of squared loadings across factor columns:
+$$\Lambda^* \Lambda^{*T} = (\Lambda \mathbf{T})(\Lambda \mathbf{T})^T = \Lambda \mathbf{T} \mathbf{T}^T \Lambda^T = \Lambda \Lambda^T = \mathbf{R} - \Psi$$
+
+Because communalities ($h_i^{*2} = h_i^2$) do not change under orthogonal transformations, many equivalent configurations exist. 
+
+We applied **Orthogonal Varimax Rotation** to maximize the variance of squared loadings within each factor column:
 
 $$V = \sum_{j=1}^k \left[ \frac{1}{p} \sum_{i=1}^p \left( \frac{\lambda_{ij}^*}{\sqrt{h_i^2}} \right)^4 - \left( \frac{1}{p} \sum_{i=1}^p \frac{\lambda_{ij}^{*2}}{h_i^2} \right)^2 \right]$$
 
-This drives loadings toward extreme values ($\pm 1$ or $0$), isolating each observable variable onto a primary latent axis.
-
-### 4.3 Heywood Cases and Numerical Stability
-During iterative communality estimation, small sample sizes or extreme collinearity can cause estimation algorithms to produce inadmissible numerical results where specific variance becomes negative ($\psi_i < 0$), causing communalities to exceed unity ($h_i^2 > 1.0$). These anomalies, known as **Heywood Cases**, break variance probability bounds. In this pipeline, communalities were constrained to the closed interval $h_i^2 \le 1.0$ through iterative boundary adjustment, preserving numerical stability.
+This pushes loadings toward extreme values ($\pm 1$ or $0$), aligning variables onto clear primary factor axes.
 
 ---
 
-## 5. Step-by-Step Methodological R Pipeline
+## 6. Empirical Results & Factor Interpretation
 
-The analytical pipeline is fully modularized in R within `R/`:
+After Varimax rotation, the 8 observed variables split into two clear latent dimensions:
 
-1. **`R/01_data_cleaning_and_diagnostics.R` (Cleaning & Sampling Adequacy):**
-   * Filters structural identity columns (`total_claim_amount`).
-   * Evaluates pairwise correlation structure and computes individual and global KMO values.
-2. **`R/02_matrix_spectral_decomposition.R` (Factor Extraction):**
-   * Constructs the reduced correlation matrix $\mathbf{R}^*$.
-   * Computes eigenvalues/eigenvectors and generates diagnostic Scree Plots.
-3. **`R/03_varimax_rotation_and_scoring.R` (Rotation & Scoring):**
-   * Executes Varimax orthogonal rotation.
-   * Calculates **Thomson's Regression Factor Scores** ($\hat{\mathbf{F}} = \mathbf{Z} \mathbf{R}^{-1} \hat{\Lambda}^*$) for downstream modeling.
-
----
-
-## 6. Empirical Results & Actuarial Interpretation
-
-Following data cleaning and Varimax rotation, the 8 observable insurance metrics split cleanly into two distinct latent risk factors:
-
-| Observed Variable | Factor 1 (Loss Severity) | Factor 2 (Policyholder Maturity) | Communality ($h^2$) | Uniqueness ($u^2$) | Primary Alignment |
+| Observed Variable | Factor 1 | Factor 2 | Communality ($h^2$) | Uniqueness ($u^2$) | Primary Alignment |
 | :--- | :---: | :---: | :---: | :---: | :--- |
-| `vehicle_claim` | **-0.918** | -0.029 | 0.843 | 0.157 | Factor 1 (Loss Severity) |
-| `property_claim` | **-0.849** | -0.038 | 0.722 | 0.278 | Factor 1 (Loss Severity) |
-| `injury_claim` | **-0.845** | -0.009 | 0.714 | 0.286 | Factor 1 (Loss Severity) |
-| `number_of_vehicles_involved` | **-0.428** | -0.033 | 0.184 | 0.816 | Factor 1 (Loss Severity) |
-| `months_as_customer` | -0.091 | **0.976** | 0.961 | 0.039 | Factor 2 (Driver Maturity) |
-| `age` | -0.106 | **0.974** | 0.960 | 0.040 | Factor 2 (Driver Maturity) |
-| `policy_annual_premium` | 0.018 | 0.025 | 0.001 | 0.999 | Residual Unshared Noise |
-| `policy_deductable` | -0.078 | 0.045 | 0.008 | 0.992 | Residual Unshared Noise |
+| `vehicle_claim` | **-0.918** | -0.029 | 0.843 | 0.157 | Factor 1 |
+| `property_claim` | **-0.849** | -0.038 | 0.722 | 0.278 | Factor 1 |
+| `injury_claim` | **-0.845** | -0.009 | 0.714 | 0.286 | Factor 1 |
+| `number_of_vehicles_involved` | **-0.428** | -0.033 | 0.184 | 0.816 | Factor 1 (Secondary) |
+| `months_as_customer` | -0.091 | **0.976** | 0.961 | 0.039 | Factor 2 |
+| `age` | -0.106 | **0.974** | 0.960 | 0.040 | Factor 2 |
+| `policy_annual_premium` | 0.018 | 0.025 | 0.001 | 0.999 | Weak Common Structure |
+| `policy_deductable` | -0.078 | 0.045 | 0.008 | 0.992 | Weak Common Structure |
 
-### Substantive Interpretation of Latent Constructs:
+### Interpretation of Latent Dimensions:
 
-* **Factor 1: Claims Loss Severity (Payout Magnitude):** Strongly loaded by `vehicle_claim` ($-0.918$), `property_claim` ($-0.849$), and `injury_claim` ($-0.845$). This factor measures financial loss per incident. High negative loadings reflect simultaneous scaling across all claim categories during major accidents.
-* **Factor 2: Policyholder Maturity & Loyalty:** Dominated by `months_as_customer` ($+0.976$) and driver `age` ($+0.974$). This factor captures customer tenure, driver experience, and portfolio retention.
-* **Contractual Variables (`policy_annual_premium`, `policy_deductable`):** Exhibited communalities near zero ($h^2 \le 0.008$) and uniqueness near unity ($u^2 \ge 0.992$). This confirms that contractual pricing terms are set independently of claims severity or driver maturity in this portfolio, behaving as unshared specific variance.
+* **Factor 1 — Claim Loss Magnitude:** Highly loaded by `vehicle_claim` ($-0.918$), `property_claim` ($-0.849$), and `injury_claim` ($-0.845$). This factor reflects financial claim severity. The moderate loading for `number_of_vehicles_involved` ($-0.428$) indicates a secondary effect.
+* **Factor 2 — Policyholder Profile / Tenure:** Dominated by `months_as_customer` ($+0.976$) and driver `age` ($+0.974$). This factor captures driver experience and tenure.
+* **Contractual Variables (`policy_annual_premium`, `policy_deductable`):** Showed communalities near zero ($h^2 \le 0.008$) and uniqueness near one ($u^2 \ge 0.992$). This shows that their variance is **not captured by the two retained factors**. This does not mean premiums or deductibles are independent of risk overall, but rather that their variation lies outside these two dimensions.
 
 ---
 
-## 7. Geometric & Visual Breakdown of Latent Space
+## 7. Geometric & Visual Diagnostics
 
 ### 7.1 Scree Plot Diagnostic
 ![Scree Plot](scree_plot.png)
-* **Geometric Feature:** The eigenvalue curve displays a sharp drop ("elbow") after component $2$. The eigenvalue for Component 1 ($\lambda_1 = 2.51$) and Component 2 ($\lambda_2 = 1.89$) sit well above Kaiser's horizontal reference line ($\lambda = 1.0$), while Components 3–8 flatten into a noise floor.
+* **Interpretation:** Eigenvalues drop sharply after component 2. Components 1 ($\lambda_1 = 2.51$) and 2 ($\lambda_2 = 1.89$) sit above Kaiser's threshold ($\lambda = 1.0$), while components 3–8 level off into noise.
 
 ---
 
 ### 7.2 Rotated Factor Loading Space (Geometric Breakdown)
 ![Factor Loading Map](factor_loadings_map.png)
 
-Projecting the observable variables into a 2-dimensional Cartesian space ($X$-axis: Factor 1, $Y$-axis: Factor 2) reveals four critical geometric properties:
+Plotting variables on Cartesian coordinates ($X$-axis: Factor 1, $Y$-axis: Factor 2) highlights four geometric properties:
 
-1. **Coordinate Axis Mapping:** 
-   * **Horizontal Axis ($X$-axis — Loss Severity):** Measures claim size. Claims variables (`vehicle_claim`, `property_claim`, `injury_claim`) cluster in the far left region ($X \approx -0.85 \text{ to } -0.92$), establishing the horizontal axis as a claim severity gradient.
-   * **Vertical Axis ($Y$-axis — Driver Maturity):** Measures tenure and age. Demographic metrics (`age`, `months_as_customer`) project to the top ($Y \approx +0.97$), establishing the vertical axis as a customer stability gradient.
-2. **Cluster Proximity & Covariance:** Variables located close together (e.g., `vehicle_claim`, `property_claim`, `injury_claim`) share strong pairwise correlations and define a shared latent risk dimension.
-3. **Simple Structure via Orthogonal Alignment:** `age` and `months_as_customer` lie almost directly on the vertical axis ($X \approx -0.10, Y \approx 0.97$). This orthogonal alignment confirms that Varimax rotation effectively eliminated cross-loadings, producing interpretable, unconfounded latent axes.
-4. **Uninformative Variables at the Origin $(0,0)$:** Contractual metrics (`policy_annual_premium`, `policy_deductable`) sit at the coordinate origin $(0,0)$. This geometric position confirms that they share no variance with claims severity or driver age ($h^2 \approx 0.000$).
+1. **Axis Alignment:** Claim metrics (`vehicle_claim`, `property_claim`, `injury_claim`) cluster on the far left ($X \approx -0.85 \text{ to } -0.92$), marking the horizontal axis as a loss severity scale. Demographic metrics (`age`, `months_as_customer`) cluster near the top ($Y \approx +0.97$), defining the vertical axis as a policyholder profile scale.
+2. **Cluster Proximity:** Close distance between claim variables confirms shared correlation within Factor 1.
+3. **Simple Structure:** `age` and `months_as_customer` sit almost directly on the vertical axis ($X \approx -0.10, Y \approx 0.97$), showing that Varimax rotation successfully removed cross-loadings.
+4. **Origin Position:** Contractual metrics (`policy_annual_premium`, `policy_deductable`) sit near the origin $(0,0)$, showing almost zero loading on both factors ($h^2 \approx 0.000$).
 
 ---
 
 ### 7.3 Factor Loading Heatmap
 ![Factor Heatmap](factor_loadings_heatmap.png)
-* **Matrix Contrast:** The heatmap visually illustrates the Simple Structure achieved by Varimax rotation. Dark red cells highlight primary loadings, showing that variables split cleanly into two non-overlapping latent modules.
+* **Interpretation:** The heatmap confirms simple structure. Clear color contrasts highlight two separate latent modules and mark weakly represented variables.
 
 ---
 
-## 8. Downstream Actuarial Application: GLM Risk Pricing
+## 8. Factor Scores & Potential Downstream Actuarial Application
 
-A major practical benefit of EFA in actuarial workflows is transforming correlated inputs into uncorrelated predictors for GLM pricing.
-
-### 8.1 Estimating Thomson's Factor Scores
-Using **Thomson's Regression Method**, standardized individual policyholder observations $\mathbf{Z} \in \mathbb{R}^{n \times p}$ are transformed into factor scores $\hat{\mathbf{F}} \in \mathbb{R}^{n \times k}$:
+### 8.1 Thomson's Regression Factor Scores
+Individual observations are projected into the factor space using **Thomson's Regression Method**:
 
 $$\hat{\mathbf{F}} = \mathbf{Z} \mathbf{R}^{-1} \hat{\Lambda}^*$$
 
-Where $\mathbf{R}^{-1}$ is the inverted sample correlation matrix and $\hat{\Lambda}^*$ is the Varimax-rotated loading matrix.
+Where $\mathbf{Z} \in \mathbb{R}^{n \times p}$ is the standardized observation matrix, $\mathbf{R}^{-1}$ is the inverted sample correlation matrix, and $\hat{\Lambda}^* \in \mathbb{R}^{p \times k}$ is the rotated loading matrix.
 
-### 8.2 Integrating Factor Scores into Pure Premium GLMs
-Actuaries model expected pure loss premium $\mathbb{E}[Y]$ using a Tweedie or Gamma-Poisson GLM with a log-link function:
+### 8.2 Potential Downstream Extension: GLM Pure Premium Modeling
+A practical next step is evaluating latent factor scores as uncorrelated predictors in downstream Generalized Linear Models (GLMs) for pricing:
 
 $$\log(\mathbb{E}[Y_i]) = \beta_0 + \beta_1 \hat{F}_{i,1} + \beta_2 \hat{F}_{i,2} + \sum_{m} \gamma_m W_{i,m}$$
 
-Where $\hat{F}_{i,1}$ is the Loss Severity score for policy $i$, $\hat{F}_{i,2}$ is the Driver Maturity score, and $W_{i,m}$ represents additional exogenous rating factors.
+Where $\hat{F}_{i,1}$ is the Claim Loss Magnitude score for policy $i$, $\hat{F}_{i,2}$ is the Policyholder Profile score, and $W_{i,m}$ represents exogenous rating variables.
 
-**Key Modeling Advantages:**
-* **Zero Multicollinearity ($\text{Cov}(\hat{F}_1, \hat{F}_2) = 0$):** Eliminates variance inflation in estimated coefficients ($\hat{\beta}_1, \hat{\beta}_2$).
-* **Model Stability:** Coefficient estimates remain stable under cross-validation and portfolio resamples.
-* **Parsimonious Risk Segmentation:** Replaces multiple correlated claim metrics with two interpretable, orthogonal risk factors.
+* **Note:** This report estimates the factor structure and generates factor scores. Full GLM implementation represents a prospective future extension rather than an empirical result of this current document.
 
 ---
 
-## 9. Comprehensive Academic Conclusions
+## 9. Project Limitations
 
-1. **Validation of the Principle of Parsimony ($k \ll p$):**
-   * *Theoretical Link:* Factor analysis achieves dimensional compression while preserving covariance structure.
-   * *Empirical Evidence:* Spectral decomposition reduced $p = 8$ insurance metrics to $k = 2$ orthogonal factors, capturing **$54.91\%$** of portfolio variance ($\lambda_1 = 2.51$, $\lambda_2 = 1.89$).
-
-2. **Mitigation of Multicollinearity & Sampling Adequacy:**
-   * *Theoretical Link:* GLMs and factor extraction require a non-singular correlation matrix ($\det(\mathbf{R}) > 0$).
-   * *Empirical Evidence:* Removing exact structural identities (`total_claim_amount`) restored full rank. An **Overall KMO of 0.61** confirmed sampling factorability.
-
-3. **Simple Structure via Varimax Rotation:**
-   * *Theoretical Link:* Orthogonal rotations preserve communalities ($h_i^{*2} = h_i^2$) while isolating variable loadings onto primary axes.
-   * *Empirical Evidence:* Varimax rotation clearly separated claim indicators (**Factor 1: Loss Severity**) from driver demographics (**Factor 2: Policyholder Maturity**).
-
-4. **EFA vs. Principal Component Analysis (PCA):**
-   * *Theoretical Link:* PCA is a deterministic transformation explaining total variance ($\mathbf{Y} = \Gamma \mathbf{X}$), while EFA models a generative latent structure separating common variance from unique measurement errors ($\mathbf{X} = \Lambda \mathbf{f} + \Psi$).
-   * *Empirical Evidence:* Thomson's factor scores ($\hat{\mathbf{F}}$) isolate shared structural risk, providing uncorrelated inputs for downstream actuarial GLM pricing.
+1. **Moderate KMO Statistic:** An overall KMO of 0.61 indicates moderate sampling adequacy. Results should be interpreted as exploratory.
+2. **Unrepresented Contractual Metrics:** Premium and deductible show negligible common variance under the 2-factor solution, showing that they do not belong to this shared latent system.
+3. **Factor Retention Criteria:** The model relies on Kaiser's criterion and Scree plot inspection. Parallel Analysis should be added in future revisions for further validation.
+4. **Qualitative Labels:** Factor labels are qualitative interpretations of loading patterns, not directly observed physical entities.
+5. **Predictive Validation:** The predictive performance of factor scores within GLMs needs to be evaluated empirically against original variable benchmarks.
 
 ---
 
-## 10. Bibliography & Recommended References
+## 10. Reproducible R Pipeline Architecture
+
+The pipeline is organized into modular scripts inside `R/`:
+
+* `R/01_data_cleaning_and_diagnostics.R`: Data preparation, redundancy removal, correlation checks, and KMO/Bartlett diagnostics.
+* `R/02_matrix_spectral_decomposition.R`: Reduced correlation matrix construction, spectral decomposition, eigenvalue calculation, and Scree Plot generation.
+* `R/03_varimax_rotation_and_scoring.R`: Varimax orthogonal rotation, communality/uniqueness estimation, loading map/heatmap visualization, and Thomson factor score generation.
+
+---
+
+## 11. Key Empirical Conclusions
+
+1. **Redundancy Removal:** Excluding `total_claim_amount` removed deterministic linear dependence and restored invertibility ($\det(\mathbf{R}) > 0$).
+2. **Dimensionality Reduction:** Spectral extraction reduced $p = 8$ variables into $k = 2$ orthogonal factors, capturing **$54.91\%$** of standardized variance ($\lambda_1 = 2.51, \lambda_2 = 1.89$).
+3. **Latent Structure:** Factor 1 captures **Claim Loss Magnitude** and Factor 2 captures **Policyholder Profile / Tenure**.
+4. **Variable Specificity:** Contractual terms (`policy_annual_premium`, `policy_deductable`) behave as unshared specific variance rather than indicators of the main common factors.
+
+---
+
+## 12. Bibliography & Recommended References
 
 1. **Johnson, R. A., & Wichern, D. W. (2007).** *Applied Multivariate Statistical Analysis* (6th ed.). Pearson Prentice Hall.
 2. **Hair, J. F., Black, W. C., Babin, B. J., & Anderson, R. E. (2014).** *Multivariate Data Analysis* (7th ed.). Pearson Education.
