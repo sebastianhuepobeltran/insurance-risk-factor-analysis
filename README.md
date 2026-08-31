@@ -13,113 +13,106 @@
 
 ## 1. Introduction & Scientific Motivation
 
-In diverse fields such as psychology, economics, and actuarial science, complex phenomena involve underlying concepts that cannot be measured directly (e.g., general intelligence, economic wellbeing, or underlying insurance risk). The central statistical question guiding this investigation is:
+In complex analytical fields such as actuarial science, financial econometrics, and psychometrics, researchers frequently encounter critical phenomena driven by underlying mechanisms that cannot be observed directly—such as driver risk profile, economic wellbeing, or underlying claim severity. The foundational statistical question guiding this investigation is:
 
-$$\text{¿Es posible explicar la relación conjunta entre múltiples variables observadas mediante un número reducido de variables latentes?}$$
+$$\text{Is it possible to explain the joint relationship among multiple observed variables through a smaller set of unobserved latent variables?}$$
 
-Cuando se trabaja con carteras de seguros de alta dimensión, los analistas rastrean simultáneamente decenas o cientos de atributos de las pólizas y de los siniestros. La introducción de variables altamente colineales de forma directa en los modelos predictivos y de tarificación (como los Modelos Lineales Generalizados o GLMs) precipita consecuencias estadísticas graves: multicolinealidad severa, parámetros de regresión inestables, inflación de varianza y singularidad en la matriz de correlaciones. 
+When analyzing high-dimensional insurance portfolios, actuaries routinely record dozens of policyholder and claim attributes (e.g., policyholder age, customer tenure, annual premiums, deductibles, and individual payout amounts for vehicle damage, property destruction, and medical injuries). Feeding highly correlated metrics directly into predictive risk models (such as Generalized Linear Models for loss pricing) triggers severe statistical complications: **extreme multicollinearity, unstable parameter estimation, variance inflation, and matrix singularity ($\det(\mathbf{R}) \approx 0$)**.
 
-Para resolver este desafío, este proyecto implementa un pipeline riguroso de **Análisis de Factores Exploratorios (EFA)** bajo el **Principio de Parsimonia**, cuyo objetivo primordial es explicar la máxima variabilidad observada en el portafolio mediante un conjunto mínimo de dimensiones latentes ortogonales ($k \ll p$).
+This project implements a comprehensive **Exploratory Factor Analysis (EFA)** pipeline grounded in the **Principle of Parsimony**. The fundamental objective is to compress an 8-dimensional space ($p = 8$) into a low-dimensional subspace of orthogonal latent factors ($k = 2$, where $k \ll p$), isolating genuine structural covariance from unshared measurement noise.
 
 ---
 
 ## 2. Theoretical Framework & Mathematical Formulation
 
 ### 2.1 The Classical Linear Factor Model
-Sea $\mathbf{X} = (X_1, X_2, \dots, X_p)^T \in \mathbb{R}^p$ un vector aleatorio observable con vector de medias $\boldsymbol{\mu} = \mathbb{E}[\mathbf{X}]$ y matriz de covarianzas $\mathbf{\Sigma}$. El modelo factorial lineal postula que cada variable observada es una combinación lineal de un conjunto de $k$ factores comunes no observables $\mathbf{f} = (f_1, f_2, \dots, f_k)^T$ y un término de error específico $\mathbf{U} = (U_1, U_2, \dots, U_p)^T$:
+Let $\mathbf{X} = (X_1, X_2, \dots, X_p)^T \in \mathbb{R}^p$ be an observable random vector with expectation vector $\boldsymbol{\mu} = \mathbb{E}[\mathbf{X}]$ and population covariance matrix $\mathbf{\Sigma}$. The classical linear factor model expresses each observed variable as a linear combination of $k$ unobserved common latent factors $\mathbf{f} = (f_1, f_2, \dots, f_k)^T$ plus a unique specific error term $\mathbf{U} = (U_1, U_2, \dots, U_p)^T$:
 
 $$\mathbf{X} = \boldsymbol{\mu} + \Lambda \mathbf{f} + \mathbf{U}$$
 
-Donde:
-* $\Lambda \in \mathbb{R}^{p \times k}$ es la **matriz de cargas factoriales** (factor loadings), cuyos elementos $\lambda_{ij}$ miden la fuerza de asociación entre la variable $i$ y el factor latente $j$.
-* $\mathbf{f} \sim \mathcal{N}_k(\mathbf{0}, \Phi)$ representa el vector de factores comunes estandarizados.
-* $\mathbf{U} \sim \mathcal{N}_p(\mathbf{0}, \Psi)$ representa el vector de factores únicos o errores específicos, donde $\Psi = \text{diag}(\psi_1, \psi_2, \dots, \psi_p)$ es una matriz diagonal que contiene las varianzas específicas de cada variable observada.
+Where:
+* $\boldsymbol{\mu} \in \mathbb{R}^p$ is the location parameter vector.
+* $\Lambda \in \mathbb{R}^{p \times k}$ represents the **matrix of factor loadings** ($\lambda_{ij}$), where each entry measures the structural linear contribution of common factor $j$ to observed variable $i$.
+* $\mathbf{f} \sim \mathcal{N}_k(\mathbf{0}, \Phi)$ represents the standardized common latent factors.
+* $\mathbf{U} \sim \mathcal{N}_p(\mathbf{0}, \Psi)$ represents unique errors or specific factors, where $\Psi = \text{diag}(\psi_1, \psi_2, \dots, \psi_p)$ is a diagonal matrix containing unique variances.
 
-### 2.3 Structural Covariance Decomposition
-Bajo los supuestos clásicos de que los factores comunes y los errores específicos son incorrelacionados entre sí ($\text{Cov}(\mathbf{f}, \mathbf{U}) = \mathbf{0}$), la matriz de covarianzas poblacional $\mathbf{\Sigma} = \text{Var}(\mathbf{X})$ se descompone estructuralmente como:
+### 2.2 Covariance Decomposition & The Concept of Communality
+Assuming that common factors and unique errors are mutually uncorrelated ($\text{Cov}(\mathbf{f}, \mathbf{U}) = \mathbf{0}$), the population covariance matrix $\mathbf{\Sigma} = \text{Var}(\mathbf{X})$ decomposes into structural common variance and specific variance:
 
 $$\mathbf{\Sigma} = \Lambda \Phi \Lambda^T + \Psi$$
 
-Cuando los factores latentes son ortogonales entre sí ($\Phi = \mathbf{I}_k$), esta expresión se simplifica elegantemente a:
+When latent factors are assumed to be orthogonal ($\Phi = \mathbf{I}_k$), this structure simplifies to:
 
 $$\mathbf{\Sigma} = \Lambda \Lambda^T + \Psi$$
 
-Para cualquier variable individual $X_i$, su varianza total $\sigma_{ii}$ se particiona de manera exacta en dos componentes fundamentales: la **Comunalidad** ($h_i^2$) y la **Uniqueness o Varianza Específica** ($\psi_i$):
+For any observed variable $X_i$, its total variance $\sigma_{ii}$ splits into two mutually exclusive components: **Communality** ($h_i^2$) and **Uniqueness** ($u_i^2 = \psi_i$):
 
-$$\text{Var}(X_i) = \sigma_{ii} = \underbrace{\sum_{j=1}^k \lambda_{ij}^2}_{\text{Comunalidad } h_i^2} + \underbrace{\psi_i}_{\text{Uniqueness } u_i^2}$$
+$$\text{Var}(X_i) = \sigma_{ii} = \underbrace{\sum_{j=1}^k \lambda_{ij}^2}_{\text{Communality } h_i^2} + \underbrace{\psi_i}_{\text{Uniqueness } u_i^2}$$
 
-* **Comunalidad ($h_i^2$):** Proporción de la varianza de la variable $X_i$ que es explicada conjuntamente por los $k$ factores comunes.
-* **Uniqueness ($u_i^2$):** Varianza residual atribuible exclusivamente a la variable $X_i$ y al error de medición aleatorio.
+* **What is Communality ($h_i^2$)?** Communality measures the total proportion of a variable's variance that is shared with and explained by the $k$ common latent factors. A high communality ($h_i^2 \to 1.0$) confirms that the variable is a reliable indicator of the underlying latent dimensions.
+* **What is Uniqueness / Specific Variance ($u_i^2 = \psi_i$)?** Uniqueness represents the residual variance attributable strictly to that specific variable plus random measurement error. Variables with high uniqueness ($u_i^2 \to 1.0$) do not share covariance with the rest of the system and behave as unshared noise.
 
 ---
 
-## 3. Properties and Transformations of the Model
+## 3. Rotations, Geometry, and Indeterminacy
 
 ### 3.1 Standardization and Correlation Structure
-En la práctica actuarial, las variables poseen unidades de medida heterogéneas (dólares, meses, conteos de vehículos). Al estandarizar el vector observado mediante la transformación:
-
-$$Y_i = \frac{X_i - \mu_i}{\sigma_i}$$
-
-Se obtiene que la matriz de covarianzas del nuevo vector estandarizado coincide con la matriz de correlaciones muestral, $\text{Cov}(\mathbf{Y}) = \mathbf{R}$, permitiendo formular el modelo factorial sobre dicha matriz:
+In actuarial applications, variables operate on different scales (currency amounts, years, vehicle counts). Standardizing variables ($Y_i = \frac{X_i - \mu_i}{\sigma_i}$) transforms the covariance matrix into the sample correlation matrix $\text{Cov}(\mathbf{Y}) = \mathbf{R}$:
 
 $$\mathbf{R} = \Lambda \Lambda^T + \Psi$$
 
-### 3.2 Rotation Indeterminacy and the Varimax Criterion
-Una propiedad fundamental del modelo factorial es su **falta de unicidad en las cargas**. Si $\mathbf{T} \in \mathbb{R}^{k \times k}$ es una matriz ortogonal tal que $\mathbf{T}^T \mathbf{T} = \mathbf{T} \mathbf{T}^T = \mathbf{I}$, es posible redefinir los factores y las cargas sin alterar el modelo:
+### 3.2 Rotation Indeterminacy & The Varimax Criterion
+A core mathematical property of factor models is **rotation indeterminacy**. If $\mathbf{T} \in \mathbb{R}^{k \times k}$ is an orthogonal rotation matrix ($\mathbf{T}^T \mathbf{T} = \mathbf{T} \mathbf{T}^T = \mathbf{I}$), transformed loadings and factors can be defined as:
 
-$$\Lambda^* = \Lambda \mathbf{T}, \quad \mathbf{f}^* = \mathbf{T}^T \mathbf{f}$$
+$$\Lambda^* = \Lambda \mathbf{T}, \quad \mathbf{f}^* = \mathbf{T}^T \mathbf{f} \implies \Lambda^* \Lambda^{*T} = (\Lambda \mathbf{T})(\Lambda \mathbf{T})^T = \Lambda \mathbf{T} \mathbf{T}^T \Lambda^T = \Lambda \Lambda^T$$
 
-Sustituyendo en la estructura de covarianza:
+Because the population covariance matrix $\mathbf{\Sigma}$ and individual communalities ($h_i^{*2} = h_i^2$) remain completely invariant under orthogonal rotation, infinite mathematically equivalent factor configurations exist.
 
-$$\mathbf{\Sigma} = \Lambda^* \Lambda^{*T} + \Psi = (\Lambda \mathbf{T})(\Lambda \mathbf{T})^T + \Psi = \Lambda \mathbf{T} \mathbf{T}^T \Lambda^T + \Psi = \Lambda \Lambda^T + \Psi$$
-
-Dado que la matriz de covarianza $\mathbf{\Sigma}$ y las comunalidades permanecen completamente invariantes ante transformaciones ortogonales ($h_i^{*2} = h_i^2$), existen infinitas soluciones matemáticas equivalentes. Para disipar esta ambigüedad y facilitar la interpretación sustantiva, se implementa la **Rotación Ortogonal Varimax**, la cual maximiza la varianza de las cargas al cuadrado dentro de cada factor:
+To resolve cross-loading ambiguity, we apply **Orthogonal Varimax Rotation**, which maximizes the variance of squared loadings within each factor column:
 
 $$V = \sum_{j=1}^k \left[ \frac{1}{p} \sum_{i=1}^p \lambda_{ij}^{*4} - \left( \frac{1}{p} \sum_{i=1}^p \lambda_{ij}^{*2} \right)^2 \right]$$
 
-Este procedimiento fuerza una "estructura simple" donde cada variable observada exhibe una carga alta en un único factor y cargas cercanas a cero en los demás.
+This optimization drives loadings toward extreme values ($\pm 1$ or $0$), fulfilling Thurstone's **Simple Structure** principle: each variable aligns distinctly with a single factor axis while minimizing cross-loadings.
 
 ---
 
 ## 4. Communality Estimation, Reduced Matrices & Heywood Cases
 
 ### 4.1 The Reduced Correlation Matrix
-Al sustraer la matriz de varianzas específicas $\Psi$ de la matriz de correlaciones $\mathbf{R}$, se obtiene la denominada **matriz de correlación reducida** $\mathbf{R}^*$:
+Subtracting specific variances $\Psi$ from the correlation matrix yields the **reduced correlation matrix** $\mathbf{R}^*$:
 
 $$\mathbf{R}^* = \mathbf{R} - \Psi = \Lambda \Lambda^T$$
 
-En esta matriz transformada, los elementos de la diagonal principal ya no son unos, sino las comunalidades exactas ($h_i^2$).
+In $\mathbf{R}^*$, the main diagonal elements are replaced by the communalities ($h_i^2$) instead of ones.
 
-### 4.2 Analytical Estimation Methods for Communalities
-Dado que $\Psi$ es inicialmente desconocida, las comunalidades se estiman iterativamente mediante diversas estrategias auxiliares:
-1. **Máxima Correlación Absoluta:** $h_i^2 = \max_{j \neq i} |r_{ij}|$
-2. **Promedio de Correlaciones:** $h_i^2 = \frac{\sum_{j \neq i} r_{ij}}{p-1}$
-3. **Coeficiente de Determinación Múltiple ($R_i^2$):** Obtenido al regredir la variable $X_i$ sobre las $p-1$ variables restantes del conjunto de datos.
+### 4.2 Estimation Methods & Heywood Cases
+Because $\Psi$ is unknown prior to model fitting, communalities are estimated iteratively using methods such as:
+1. **Maximum Absolute Correlation:** $h_i^2 = \max_{j \neq i} |r_{ij}|$
+2. **Squared Multiple Correlation ($R_i^2$):** Regressing $X_i$ on all remaining $p-1$ variables.
 
-### 4.3 Heywood Cases and Inadmissible Solutions
-Durante el proceso de estimación iterativa, restricciones muestrales severas o problemas de colinealidad extrema pueden arrojar estimaciones donde la varianza específica deviene negativa ($\psi_i < 0$), lo que a su vez genera comunidades inadmisibles superiores a la unidad ($h_i^2 > 1$). Estos escenarios se conocen como **Casos Heywood** y se corrigen comúnmente acotando teóricamente las comunalidades al intervalo cerrado $h_i^2 \le 1$.
+Under severe sample limitations or strong collinearity, iterative algorithms can produce inadmissible numerical solutions where specific variance becomes negative ($\psi_i < 0$), causing communalities to exceed unity ($h_i^2 > 1.0$). Known as **Heywood Cases**, these anomalies are resolved by bounding communalities at $h_i^2 \le 1.0$.
 
 ---
 
-## 5. Estimation Methods & Sampling Adequacy
+## 5. Step-by-Step Methodological Pipeline
 
-### 5.1 Comparative Overview of Estimation Approaches
-* **Método de Componentes Principales:** Utiliza la descomposición espectral de la matriz de correlaciones ($\mathbf{R} = \mathbf{P} \mathbf{D} \mathbf{P}^T$) para aproximar la matriz de cargas mediante los $k$ autovalores mayores: $\hat{\Lambda} = \mathbf{P}_1 \mathbf{D}_1^{1/2}$. No requiere supuestos distribucionales estrictos.
-* **Método del Factor Principal:** Opera de manera iterativa sobre la matriz de correlación reducida $\mathbf{R}^*$, actualizando las comunalidades hasta alcanzar la convergencia numérica.
-* **Máxima Verosimilitud (ML):** Requiere el supuesto de normalidad multivariada sobre las observaciones para maximizar la función de verosimilitud del modelo, permitiendo contrastes formales de bondad de ajuste mediante pruebas de razón de verosimilitud ($\chi^2$).
+The analytical pipeline is organized into three sequential R modules inside `R/`:
 
-### 5.2 Kaiser-Meyer-Olkin (KMO) Measure of Sampling Adequacy
-Para verificar empíricamente si la matriz de correlaciones posee la estructura de correlación parcial idónea para el análisis factorial, se calcula el índice KMO:
-
-$$\text{KMO} = \frac{\sum_{i \neq j} r_{ij}^2}{\sum_{i \neq j} r_{ij}^2 + \sum_{i \neq j} a_{ij}^2}$$
-
-Donde $r_{ij}$ son los coeficientes de correlación simple y $a_{ij}$ son los coeficientes de correlación parcial entre las variables. Valores superiores a $0.60$ garantizan una adecuación muestral aceptable para proceder con la extracción de factores.
+1. **`R/01_data_cleaning_and_diagnostics.R` (Multicollinearity & KMO Test):**
+   * Identifies and removes exact linear identities (e.g., `total_claim_amount` = `injury_claim` + `property_claim` + `vehicle_claim`) that break matrix inversion ($\det(\mathbf{R}) = 0$).
+   * Calculates the **Kaiser-Meyer-Olkin (KMO)** index to verify sample factorability.
+2. **`R/02_matrix_spectral_decomposition.R` (Factor Extraction):**
+   * Solves the characteristic equation $\det(\mathbf{R} - \lambda \mathbf{I}_p) = 0$ to extract eigenvalues and eigenvectors.
+   * Retains $k = 2$ factors based on **Kaiser's Criterion** ($\lambda > 1.0$).
+3. **`R/03_varimax_rotation_and_scoring.R` (Rotation & Scoring):**
+   * Applies Varimax rotation to align factor axes.
+   * Computes **Thomson's Regression Factor Scores** ($\hat{\mathbf{F}} = \mathbf{Z} \mathbf{R}^{-1} \hat{\Lambda}^*$) for downstream actuarial GLM modeling.
 
 ---
 
 ## 6. Empirical Results & Actuarial Interpretation
 
-A través del pipeline computacional implementado en R, se procesó el conjunto de datos de siniestros de automóviles. Tras resolver la multicolinealidad estructural (eliminando la identidad exacta `total_claim_amount` = `injury_claim` + `property_claim` + `vehicle_claim`), se obtuvo un **KMO global de 0.61** y una retención óptima de $k = 2$ factores bajo el Criterio de Kaiser ($\lambda > 1$), explicando el **$54.91\%$** de la varianza total del portafolio.
+After removing exact linear identities, the dataset achieved an **Overall KMO of 0.61**, confirming sampling adequacy. Spectral extraction retained $k = 2$ orthogonal factors explaining **$54.91\%$** of total portfolio variance ($\lambda_1 = 2.51$, $\lambda_2 = 1.89$).
 
 | Observed Variable | Factor 1 (Loss Severity) | Factor 2 (Policyholder Maturity) | Communality ($h^2$) | Uniqueness ($u^2$) |
 | :--- | :---: | :---: | :---: | :---: |
@@ -132,38 +125,60 @@ A través del pipeline computacional implementado en R, se procesó el conjunto 
 | `policy_annual_premium` | 0.018 | 0.025 | 0.001 | 0.999 |
 | `policy_deductable` | -0.078 | 0.045 | 0.008 | 0.992 |
 
+### Detailed Interpretation of Latent Factors:
+* **Factor 1: Economic Loss Severity (Claims Magnitude):** Strongly loaded by `vehicle_claim` ($-0.918$), `property_claim` ($-0.849$), and `injury_claim` ($-0.845$). This factor measures the overall financial damage of an accident across all claim categories.
+* **Factor 2: Policyholder Maturity & Loyalty:** Driven almost entirely by `months_as_customer` ($+0.976$) and driver `age` ($+0.974$). This factor captures driver experience, stability, and customer tenure.
+
 ---
 
-## 7. Visualizations
+## 7. Geometric Analysis of Factor Visualizations
 
-### Scree Plot Diagnostic
+### 7.1 Scree Plot Diagnostic
 ![Scree Plot](scree_plot.png)
+* **Interpretation:** The Scree Plot orders eigenvalues ($\lambda_j$) from largest to smallest. Components above Kaiser's threshold ($\lambda = 1.0$) contain substantial common variance and are retained ($\text{PC}_1$ and $\text{PC}_2$), while subsequent components represent residual noise.
 
-### Rotated Factor Loading Space (Varimax)
+---
+
+### 7.2 Rotated Factor Loading Space (Geometrical Breakdown)
 ![Factor Loading Map](factor_loadings_map.png)
 
-### Factor Loading Heatmap
+In classical multivariate textbooks (e.g., Johnson & Wichern), the Factor Loading Map projects observed variables as points within a $k$-dimensional coordinate system. Understanding its geometric properties is critical:
+
+* **What do the Coordinate Axes represent?**
+  * **Horizontal Axis ($X$-axis — Factor 1: Economic Loss Severity):** Quantifies financial payout magnitude. Variables positioned far to the left (`vehicle_claim`, `property_claim`, `injury_claim`) exhibit strong negative loadings ($\approx -0.85$ to $-0.92$), meaning the $X$-axis measures financial claim magnitude.
+  * **Vertical Axis ($Y$-axis — Factor 2: Policyholder Maturity):** Measures customer longevity and experience. Variables positioned high on the vertical axis (`months_as_customer`, `age`) exhibit positive loadings approaching $+0.98$.
+* **What does the Proximity Between Red Points mean?**
+  * Points located close together (e.g., `vehicle_claim`, `property_claim`, and `injury_claim` in the lower-left quadrant) share high pairwise correlations and belong to the **same latent risk dimension**. Conversely, points far apart (like `age` vs. `vehicle_claim`) represent orthogonal, independent risk concepts.
+* **What does Proximity to the Coordinate Axes mean?**
+  * When a red point lies **directly on or immediately adjacent to an axis** (e.g., `age` sitting directly on the vertical axis at $X \approx -0.10, Y \approx 0.97$), it indicates **Simple Structure achieved via Varimax rotation**. This implies the variable is *almost purely explained* by that specific factor and exhibits virtually zero cross-loading on the other factor.
+* **Uninformative Variables at the Origin $(0,0)$:**
+  * Variables near the origin (`policy_annual_premium`, `policy_deductable`) have communalities near zero ($h^2 \approx 0.001$). They share no variance with claims severity or driver maturity, behaving strictly as unshared noise ($u^2 \approx 0.999$).
+
+---
+
+### 7.3 Factor Loading Heatmap
 ![Factor Heatmap](factor_loadings_heatmap.png)
+* **Interpretation:** The heatmap presents a clean matrix view of rotated loadings $\hat{\Lambda}^*$. The sharp contrast confirms that the 8 variables split cleanly into two non-overlapping latent modules.
 
 ---
 
 ## 8. Comprehensive Academic Conclusions
 
-1. **Validación Rigurosa del Principio de Parsimonia ($k \ll p$):**
-   * *Conexión Teórica:* El objetivo central del análisis multivariado de factores es lograr una compresión óptima de la información reduciendo el espacio dimensional.
-   * *Evidencia Empírica:* La descomposición espectral y el criterio de Kaiser permitieron sintetizar $p = 8$ variables complejas del sector asegurador en tan solo $k = 2$ dimensiones latentes ortogonales, capturando de forma parsimoniosa el **$54.91\%$** de la variabilidad total del sistema ($\lambda_1 = 2.51$, $\lambda_2 = 1.89$).
+1. **Validation of the Principle of Parsimony ($k \ll p$):**
+   * *Theoretical Link:* The core objective of factor analysis is optimal data compression without losing underlying covariance structure.
+   * *Empirical Evidence:* Spectral extraction compressed $p = 8$ insurance variables into $k = 2$ orthogonal latent factors, capturing **$54.91\%$** of total portfolio variance ($\lambda_1 = 2.51$, $\lambda_2 = 1.89$).
 
-2. **Mitigación Exitosa de la Colinealidad y Garantía de Adecuación:**
-   * *Conexión Teórica:* La estabilidad numérica en la inversión de matrices de covarianza exige la no singularidad ($\det(\mathbf{R}) > 0$).
-   * *Evidencia Empírica:* La depuración de identidades lineales exactas restableció la condición de definida positiva en la matriz de correlaciones. El índice **KMO Global de 0.61** validó cuantitativamente la presencia de covarianza común suficiente para justificar la extracción de factores.
+2. **Mitigation of Multicollinearity and Sampling Adequacy:**
+   * *Theoretical Link:* Matrix inversion in multivariate models requires positive-definiteness ($\det(\mathbf{R}) > 0$).
+   * *Empirical Evidence:* Removing exact structural identities restored matrix non-singularity. The **Overall KMO of 0.61** quantitatively confirmed sufficient common covariance to proceed with factor extraction.
 
-3. **Estructura Simple e Invarianza Obtenida mediante Rotación Varimax:**
-   * *Conexión Teórica:* La indeterminación rotacional ($\Lambda^* = \Lambda \mathbf{T}$) garantiza que la estructura de covarianza poblacional $\mathbf{\Sigma} = \Lambda \Lambda^T + \Psi$ permanezca intacta mientras se maximiza la interpretabilidad de los pesos.
-   * *Evidencia Empírica:* La rotación ortogonal Varimax eliminó las cargas cruzadas ambiguas, segmentando con absoluta claridad conceptual el espacio vectorial en dos ejes interpretables: **Factor 1 (Severidad de Pérdida Económica)**, respaldado por elevadas comunalidades en `vehicle_claim` ($h^2 = 0.843$), `property_claim` ($h^2 = 0.722$) y `injury_claim` ($h^2 = 0.714$), y **Factor 2 (Madurez y Antigüedad del Asegurado)**, gobernado por la estabilidad del cliente (`months_as_customer`, $h^2 = 0.961$) y su edad (`age`, $h^2 = 0.960$). En contraste, las variables contractuales (`policy_annual_premium`, `policy_deductable`) mostraron unicidades cercanas a uno ($u^2 \approx 0.999$), comportándose como ruido específico independiente.
+3. **Simple Structure & Geometric Isolation via Varimax Rotation:**
+   * *Theoretical Link:* Rotation indeterminacy ($\Lambda^* = \Lambda \mathbf{T}$) guarantees that the population covariance structure $\mathbf{\Sigma} = \Lambda \Lambda^T + \Psi$ remains invariant while maximizing loading interpretability.
+   * *Empirical Evidence:* Varimax rotation effectively aligned variables with coordinate axes. Claims indicators (`vehicle_claim`, `property_claim`, `injury_claim`) fell along **Factor 1 (Loss Severity)**, while demographic attributes (`age`, `months_as_customer`) aligned along **Factor 2 (Policyholder Maturity)**.
 
-4. **Diferenciación Conceptual y Metodológica: EFA vs. ACP:**
-   * *Conexión Teórica:* Mientras que el Análisis de Componentes Principales opera como una transformación lineal determinista orientada a explicar la varianza total de las observaciones ($\mathbf{Y} = \Gamma \mathbf{X}$), el Análisis Factorial postula un modelo estadístico generativo que separa explícitamente la varianza compartida de los errores de medición específicos ($\mathbf{X} = \Lambda \mathbf{f} + \Psi$).
-   * *Evidencia Empírica:* La estimación rigurosa de las puntuaciones factoriales de Thomson ($\hat{\mathbf{F}}$) proporciona variables sintéticas incorrelacionadas exentas de redundancia colineal, ofreciendo una base cuantitativa óptima para alimentar fases posteriores de tarificación en Modelos Lineales Generalizados (GLMs).
+4. **Methodological Superiority: EFA vs. Principal Component Analysis (PCA):**
+   * *Theoretical Link:* While PCA is a deterministic transformation explaining total observed variance ($\mathbf{Y} = \Gamma \mathbf{X}$), Factor Analysis models a generative latent structure separating common variance from unique measurement errors ($\mathbf{X} = \Lambda \mathbf{f} + \Psi$).
+   * *Empirical Evidence:* Estimating Thomson's factor scores ($\hat{\mathbf{F}}$) provides uncorrelated risk metrics free of collinear redundancy, serving as an ideal quantitative foundation for downstream actuarial pricing in Generalized Linear Models (GLMs).
 
 ---
 
