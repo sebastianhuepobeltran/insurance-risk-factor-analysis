@@ -71,7 +71,7 @@ $$\mathbf{R} = \Lambda \Lambda^T + \Psi$$
 ### 3.2 Matrix Singularity & Multicollinearity Remediation
 In preliminary actuarial diagnostic checks, incorporating `total_claim_amount` along with its underlying constituent sub-claims (`injury_claim`, `property_claim`, `vehicle_claim`) created an exact linear deterministic dependency:
 
-$\text{total\_claim\_amount} - \text{injury\_claim} - \text{property\_claim} - \text{vehicle\_claim} = 0$
+$$\text{total\_claim\_amount} - \text{injury\_claim} - \text{property\_claim} - \text{vehicle\_claim} = 0$$
 
 This exact linear identity caused a zero eigenvalue ($\lambda_p = 0$) in the spectral decomposition, driving the determinant to zero ($\det(\mathbf{R}) = 0$). As a result, the correlation matrix became non-invertible ($\mathbf{R}^{-1}$ undefined), breaking numerical estimation algorithms. Removing `total_claim_amount` restored full rank ($\text{rank}(\mathbf{R}) = p = 8$) and guaranteed positive-definiteness ($\det(\mathbf{R}) > 0$).
 
